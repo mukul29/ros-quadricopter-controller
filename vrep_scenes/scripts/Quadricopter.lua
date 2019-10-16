@@ -1,7 +1,7 @@
 function sysCall_init() 
     -- Make sure we have version 2.4.13 or above (the particles are not supported otherwise)
-    v = sim.getInt32Parameter(sim.intparam_program_version)
-    if (v < 20413) then
+    version = sim.getInt32Parameter(sim.intparam_program_version)
+    if (version < 20413) then
         sim.displayDialog('Warning',
         'The propeller model is only fully supported from V-REP version 2.4.13 and above.&&nThis simulation will not run as expected!', 
         sim.dlgstyle_ok, false, '', nil, {0.8, 0, 0, 0, 0, 0})
@@ -11,9 +11,8 @@ function sysCall_init()
     targetObj = sim.getObjectHandle('Quadricopter_target')
     sim.setObjectParent(targetObj, -1, true)
 
-    -- This control algo was quickly written and is dirty and not optimal. It just serves as a SIMPLE example
-
-    d = sim.getObjectHandle('Quadricopter_base')
+    -- Get the object hangle for the base of the quadricopter
+    quadricopterBase = sim.getObjectHandle('Quadricopter_base')
 
     particlesAreVisible = sim.getScriptSimulationParameter(sim.handle_self, 'particlesAreVisible')
     sim.setScriptSimulationParameter(sim.handle_tree, 'particlesAreVisible', tostring(particlesAreVisible))
@@ -24,24 +23,31 @@ function sysCall_init()
     for i = 1, 4, 1 do
         propellerScripts[i] = sim.getScriptHandle('Quadricopter_propeller_respondable'..i)
     end
-    heli = sim.getObjectAssociatedWithScript(sim.handle_self)
+    quadricopter = sim.getObjectAssociatedWithScript(sim.handle_self)
 
     particlesTargetVelocities = {0, 0, 0, 0}
 
-    pParam = 2
-    iParam = 0
-    dParam = 0
-    vParam = -2
+    -- parameters for vertical control
+    positionParameter = 2 -- set the thrust wrt to the position of target and quadricopter
+    increaseParameter = 0 -- increase the thrust depending on the deltaPos, results in overshooting if set to a high value
+    dynamicParameter = 0 -- similar to positionParameter, increase or decrease the thrust if the deltaPos increases or decreases
+    velocityParameter = -2 -- how thrust depends on the current velocity
+    cumulativeDistance = 0 -- cumulative distance between target position and current position
+    lastDeltaPos = 0 -- previous value of deltaPos, simulation begins with both target and quad at same position so it is initialized 0
 
-    cumul = 0
-    lastE = 0
+    -- parameters for horizontal control
     pAlphaE = 0
     pBetaE = 0
     psp2 = 0
     psp1 = 0
 
+    -- parameters for rotational control
     prevEuler = 0
 
+
+    -- custom parameter 
+    
+    ---
 
     fakeShadow = sim.getScriptSimulationParameter(sim.handle_self, 'fakeShadow')
     if (fakeShadow) then
@@ -81,21 +87,22 @@ function sysCall_cleanup()
 end 
 
 function sysCall_actuation() 
-    -- Publishing sensor data
+    -- Publishing left proximity sensor data
     local resultLeft = sim.readProximitySensor(proximitySensorLeft)
     local detectionTriggerLeft = {}
     detectionTriggerLeft['data'] = resultLeft>0
     simROS.publish(sensorLeftPub,  detectionTriggerLeft)
 
+    -- publishing right proximity sensor data
     local resultRight = sim.readProximitySensor(proximitySensorRight)
     local detectionTriggerRight = {}
     detectionTriggerRight['data'] = resultRight>0
     simROS.publish(sensorRightPub,  detectionTriggerRight)
 
 
-    s = sim.getObjectSizeFactor(d)
+    s = sim.getObjectSizeFactor(quadricopterBase)
     
-    pos = sim.getObjectPosition(d, -1)
+    pos = sim.getObjectPosition(quadricopterBase, -1)
     if (fakeShadow) then
         itemData = {pos[1], pos[2], 0.002, 0, 0, 1, 0.2*s}
         sim.addDrawingObjectItem(shadowCont, itemData)
@@ -103,17 +110,17 @@ function sysCall_actuation()
     
     -- Vertical control:
     targetPos = sim.getObjectPosition(targetObj, -1)
-    pos = sim.getObjectPosition(d, -1)
-    l = sim.getVelocity(heli)
-    e = (targetPos[3] - pos[3])
-    cumul = cumul + e
-    pv = pParam * e
-    thrust = 5.335 + pv + iParam*cumul + dParam*(e - lastE) + l[3]*vParam
-    lastE = e
+    pos = sim.getObjectPosition(quadricopterBase, -1)
+    quadricopterVelocity = sim.getVelocity(quadricopter)
+    deltaPos = (targetPos[3] - pos[3])
+    cumulativeDistance = cumulativeDistance + deltaPos
+    pv = positionParameter * deltaPos
+    thrust = 5.335 + pv + increaseParameter*cumulativeDistance + dynamicParameter*(deltaPos - lastDeltaPos) + quadricopterVelocity[3]*velocityParameter
+    lastDeltaPos = deltaPos
     
     -- Horizontal control: 
-    sp = sim.getObjectPosition(targetObj, d)
-    m = sim.getObjectMatrix(d, -1)
+    sp = sim.getObjectPosition(targetObj, quadricopterBase)
+    m = sim.getObjectMatrix(quadricopterBase, -1)
     vx = {1, 0, 0}
     vx = sim.multiplyVector(m, vx)
     vy = {0, 1, 0}
@@ -130,7 +137,7 @@ function sysCall_actuation()
     psp1 = sp[1]
     
     -- Rotational control:
-    euler = sim.getObjectOrientation(d, targetObj)
+    euler = sim.getObjectOrientation(quadricopterBase, targetObj)
     rotCorr = euler[3]*0.1 + 2*(euler[3]-prevEuler)
     prevEuler = euler[3]
     
