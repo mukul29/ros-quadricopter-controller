@@ -45,10 +45,6 @@ function sysCall_init()
     prevEuler = 0
 
 
-    -- custom parameter 
-    
-    ---
-
     fakeShadow = sim.getScriptSimulationParameter(sim.handle_self, 'fakeShadow')
     if (fakeShadow) then
         shadowCont = sim.addDrawingObject(sim.drawing_discpoints + sim.drawing_cyclic + sim.drawing_25percenttransparency + sim.drawing_50percenttransparency + sim.drawing_itemsizes, 0.2, 0, -1, 1)
@@ -69,24 +65,39 @@ function sysCall_init()
     -- Check if RosInterface plugin is avaiable
     if (not pluginNotFound) then
         local sysTime = sim.getSystemTimeInMs(-1) 
-        local proximitySensorLeftTopicName = 'proximitySensorLeft'..sysTime
-        local proximitySensorRightTopicName = 'proximitySensorRight'..sysTime
+        local proximitySensorLeftTopicName = 'proximitySensorLeft'
+        local proximitySensorRightTopicName = 'proximitySensorRight'
+        local proximitySensorRightTopicName = 'proximitySensorRight'
+        local targetPositionSendTopicName = 'gpsToROS'
+        local targetPositionReceiveTopicName = 'gpsToVREP'
         sensorLeftPub = simROS.advertise('/'..proximitySensorLeftTopicName, 'std_msgs/Bool')
         sensorRightPub = simROS.advertise('/'..proximitySensorRightTopicName, 'std_msgs/Bool')
+        targetPositionOrientationPub = simROS.advertise('/'..targetPositionSendTopicName, 'geometry_msgs/Pose')
+        targetPositionOrientationSub = simROS.subscribe('/'..targetPositionReceiveTopicName, 'geometry_msgs/Pose', 'moveTarget')
     else
         print("<font color = '#F00'>ROS interface was not found. Cannot run.</font>@html")
     end
+end
 
-
+function moveTarget()
 end
 
 function sysCall_cleanup() 
     sim.removeDrawingObject(shadowCont)
     sim.floatingViewRemove(floorView)
     sim.floatingViewRemove(frontView)
+    simROS.shutdownPublisher(sensorLeftPub)
+    simROS.shutdownPublisher(sensorRightPub)
+    simROS.shutdownPublisher(targetPositionOrientationPub)
 end 
 
 function sysCall_actuation() 
+    -- Get position of target
+    targetPosition = sim.getObjectPosition(targetObj, -1)
+    targetOrientation = sim.getObjectOrientation(targetObj, -1)    
+    -- print(targetPosition)
+    -- print(targetOrientation)
+    --------------------------------PUBLISHING--------------------------------------------------
     -- Publishing left proximity sensor data
     local resultLeft = sim.readProximitySensor(proximitySensorLeft)
     local detectionTriggerLeft = {}
@@ -99,7 +110,12 @@ function sysCall_actuation()
     detectionTriggerRight['data'] = resultRight>0
     simROS.publish(sensorRightPub,  detectionTriggerRight)
 
-
+    --publishing target position and orientation (gps)
+    targetPublishData = {}
+    targetPublishData['position'] = {x = targetPosition[1], y = targetPosition[2], z = targetPosition[3]}
+    targetPublishData['orientation'] = {x = targetOrientation[1], y = targetOrientation[2], z = targetOrientation[3], w = 1}
+    simROS.publish(targetPositionOrientationPub, targetPublishData)
+    --------------------------------------------------------------------------------------------
     s = sim.getObjectSizeFactor(quadricopterBase)
     
     pos = sim.getObjectPosition(quadricopterBase, -1)
@@ -109,18 +125,18 @@ function sysCall_actuation()
     end
     
     -- Vertical control:
-    targetPos = sim.getObjectPosition(targetObj, -1)
+    targetPosition = sim.getObjectPosition(targetObj, -1)
     pos = sim.getObjectPosition(quadricopterBase, -1)
     quadricopterVelocity = sim.getVelocity(quadricopter)
-    deltaPos = (targetPos[3] - pos[3])
+    deltaPos = (targetPosition[3] - pos[3])
     cumulativeDistance = cumulativeDistance + deltaPos
     pv = positionParameter * deltaPos
     thrust = 5.335 + pv + increaseParameter*cumulativeDistance + dynamicParameter*(deltaPos - lastDeltaPos) + quadricopterVelocity[3]*velocityParameter
     lastDeltaPos = deltaPos
     
     -- Horizontal control: 
-    sp = sim.getObjectPosition(targetObj, quadricopterBase)
-    m = sim.getObjectMatrix(quadricopterBase, -1)
+    sp = sim.getObjectPosition(targetObj, quadricopterBase) -- position of targetObj relative to quadricopterBase
+    m = sim.getObjectMatrix(quadricopterBase, -1) -- tranformation matrix of quadricopterBase relative to world 
     vx = {1, 0, 0}
     vx = sim.multiplyVector(m, vx)
     vy = {0, 1, 0}
