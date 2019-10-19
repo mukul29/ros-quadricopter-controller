@@ -29,8 +29,8 @@ function sysCall_init()
 
     -- parameters for vertical control
     positionParameter = 2 -- set the thrust wrt to the position of target and quadricopter
-    increaseParameter = 0 -- increase the thrust depending on the deltaPos, results in overshooting if set to a high value
-    dynamicParameter = 0 -- similar to positionParameter, increase or decrease the thrust if the deltaPos increases or decreases
+    increaseParameter = 0.001 -- increase the thrust depending on the deltaPos, results in overshooting if set to a high value
+    dynamicParameter = 0.001 -- similar to positionParameter, increase or decrease the thrust if the deltaPos increases or decreases
     velocityParameter = -2 -- how thrust depends on the current velocity
     cumulativeDistance = 0 -- cumulative distance between target position and current position
     lastDeltaPos = 0 -- previous value of deltaPos, simulation begins with both target and quad at same position so it is initialized 0
@@ -79,7 +79,8 @@ function sysCall_init()
     end
 end
 
-function moveTarget()
+function moveTarget(msg)
+    targetSubscribedData = msg
 end
 
 function sysCall_cleanup() 
@@ -89,6 +90,7 @@ function sysCall_cleanup()
     simROS.shutdownPublisher(sensorLeftPub)
     simROS.shutdownPublisher(sensorRightPub)
     simROS.shutdownPublisher(targetPositionOrientationPub)
+    sim.setObjectParent(targetObj, quadricopterBase, false)
 end 
 
 function sysCall_actuation() 
@@ -116,6 +118,18 @@ function sysCall_actuation()
     targetPublishData['orientation'] = {x = targetOrientation[1], y = targetOrientation[2], z = targetOrientation[3], w = 1}
     simROS.publish(targetPositionOrientationPub, targetPublishData)
     --------------------------------------------------------------------------------------------
+    
+
+    --------------------------------SUBSCRIBING-------------------------------------------------
+    if (targetSubscribedData) then
+        newTargetLinear = {targetSubscribedData['position']['x'], targetSubscribedData['position']['y'], targetSubscribedData['position']['z']} 
+        newTargetOrientation = {targetSubscribedData['orientation']['x'], targetSubscribedData['orientation']['y'], targetSubscribedData['orientation']['z']} 
+        sim.setObjectPosition(targetObj, -1, newTargetLinear)
+        sim.setObjectOrientation(targetObj, -1, newTargetOrientation)
+    end
+
+    --------------------------------------------------------------------------------------------
+    
     s = sim.getObjectSizeFactor(quadricopterBase)
     
     pos = sim.getObjectPosition(quadricopterBase, -1)
