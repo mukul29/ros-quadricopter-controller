@@ -13,10 +13,10 @@ def gpsCallback(msg):
     targetPosition = msg
     print targetPosition
 
-    # Move the quadricopter forward (currently this is not working as intended)
+    # Move the quadricopter forward 
     # This forward movement will be required later
     targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z)
-    targetPosition.position.x += translationStep * math.sin(targetPosition.orientation.z)
+    targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z)
 
     # IMPLEMENT NEURAL CONTROL HERE
 
