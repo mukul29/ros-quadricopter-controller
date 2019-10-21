@@ -65,14 +65,19 @@ function sysCall_init()
     -- Check if RosInterface plugin is avaiable
     if (not pluginNotFound) then
         local sysTime = sim.getSystemTimeInMs(-1) 
-        local proximitySensorLeftTopicName = 'proximitySensorLeft'
-        local proximitySensorRightTopicName = 'proximitySensorRight'
-        local proximitySensorRightTopicName = 'proximitySensorRight'
+        local proximitySensorLeftBoolTopicName = 'proximitySensorLeftBool'
+        local proximitySensorRightBoolTopicName = 'proximitySensorRightBool'
+        local proximitySensorLeftDistanceTopicName = 'proximitySensorLeftDistance'
+        local proximitySensorRightDistanceTopicName = 'proximitySensorRightDistance'
         local targetPositionSendTopicName = 'gpsToROS'
         local targetPositionReceiveTopicName = 'gpsToVREP'
-        sensorLeftPub = simROS.advertise('/'..proximitySensorLeftTopicName, 'std_msgs/Bool')
-        sensorRightPub = simROS.advertise('/'..proximitySensorRightTopicName, 'std_msgs/Bool')
+
+        proximitySensorLeftBoolPub = simROS.advertise('/'..proximitySensorLeftBoolTopicName, 'std_msgs/Bool')
+        proximitySensorRightBoolPub = simROS.advertise('/'..proximitySensorRightBoolTopicName, 'std_msgs/Bool')
+        proximitySensorLeftDistancePub = simROS.advertise('/'..proximitySensorLeftDistanceTopicName, 'std_msgs/Float64')
+        proximitySensorRightDistancePub = simROS.advertise('/'..proximitySensorRightDistanceTopicName, 'std_msgs/Float64')
         targetPositionOrientationPub = simROS.advertise('/'..targetPositionSendTopicName, 'geometry_msgs/Pose')
+
         targetPositionOrientationSub = simROS.subscribe('/'..targetPositionReceiveTopicName, 'geometry_msgs/Pose', 'moveTarget')
     else
         print("<font color = '#F00'>ROS interface was not found. Cannot run.</font>@html")
@@ -87,8 +92,10 @@ function sysCall_cleanup()
     sim.removeDrawingObject(shadowCont)
     sim.floatingViewRemove(floorView)
     sim.floatingViewRemove(frontView)
-    simROS.shutdownPublisher(sensorLeftPub)
-    simROS.shutdownPublisher(sensorRightPub)
+    simROS.shutdownPublisher(proximitySensorLeftBoolPub)
+    simROS.shutdownPublisher(proximitySensorRightBoolPub)
+    simROS.shutdownPublisher(proximitySensorLeftDistancePub)
+    simROS.shutdownPublisher(proximitySensorRightDistancePub)
     simROS.shutdownPublisher(targetPositionOrientationPub)
     sim.setObjectParent(targetObj, quadricopterBase, false)
 end 
@@ -101,16 +108,30 @@ function sysCall_actuation()
     -- print(targetOrientation)
     --------------------------------PUBLISHING--------------------------------------------------
     -- Publishing left proximity sensor data
-    local resultLeft = sim.readProximitySensor(proximitySensorLeft)
+    -- sim.readProximitySensor returns 0, 1, or -1 for false, true or invalid
+    -- Distance as second parameter
+    local resultLeft = {sim.readProximitySensor(proximitySensorLeft)}
     local detectionTriggerLeft = {}
-    detectionTriggerLeft['data'] = resultLeft>0
-    simROS.publish(sensorLeftPub,  detectionTriggerLeft)
+    detectionTriggerLeft['data'] = resultLeft[1]>0
+    simROS.publish(proximitySensorLeftBoolPub, detectionTriggerLeft)
+    local proximityDistanceLeft = {}
+    proximityDistanceLeft['data'] = -1
+    if (detectionTriggerLeft['data']) then
+        proximityDistanceLeft['data'] = resultLeft[2]
+    end
+    simROS.publish(proximitySensorLeftDistancePub, proximityDistanceLeft)
 
-    -- publishing right proximity sensor data
-    local resultRight = sim.readProximitySensor(proximitySensorRight)
+    -- Publishing left proximity sensor data
+    local resultRight = {sim.readProximitySensor(proximitySensorRight)}
     local detectionTriggerRight = {}
-    detectionTriggerRight['data'] = resultRight>0
-    simROS.publish(sensorRightPub,  detectionTriggerRight)
+    detectionTriggerRight['data'] = resultRight[1]>0
+    simROS.publish(proximitySensorRightBoolPub, detectionTriggerRight)
+    local proximityDistanceRight = {}
+    proximityDistanceRight['data'] = -1
+    if (detectionTriggerRight['data']) then
+        proximityDistanceRight['data'] = resultRight[2]
+    end
+    simROS.publish(proximitySensorRightDistancePub, proximityDistanceRight)
 
     --publishing target position and orientation (gps)
     targetPublishData = {}
