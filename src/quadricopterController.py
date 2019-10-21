@@ -3,6 +3,7 @@ import rospy
 from geometry_msgs.msg import Pose
 import math
 from std_msgs.msg import Bool
+from std_msgs.msg import Float64
 import message_filters
 
 # Attributes
@@ -11,11 +12,13 @@ rotationStep = 0.01
 
 targetPosition = Pose()
 gpsPub = rospy.Publisher('gpsToVREP', Pose, queue_size=100)
-def callback(gps, proximitySensorLeft, proximitySensorRight):
+def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySensorLeftDistance, proximitySensorRightDistance):
     targetPosition = gps
     print targetPosition
-    print proximitySensorLeft
-    print proximitySensorRight
+    print proximitySensorLeftBool
+    print proximitySensorRightBool
+    print proximitySensorLeftDistance
+    print proximitySensorRightDistance
 
     # Move the quadricopter forward 
     # This forward movement will be required later
@@ -33,10 +36,12 @@ def callback(gps, proximitySensorLeft, proximitySensorRight):
 def controller():
     rospy.init_node('connectionToVREP', anonymous=True)
     gpsSub = message_filters.Subscriber('gpsToROS', Pose)
-    proximitySensorLeftSub = message_filters.Subscriber('proximitySensorLeft', Bool)
-    proximitySensorRightSub = message_filters.Subscriber('proximitySensorRight', Bool)
-
-    approximateTimeSyncronizer = message_filters.ApproximateTimeSynchronizer([gpsSub, proximitySensorLeftSub, proximitySensorRightSub], queue_size=10, slop=0.1, allow_headerless=True)
+    proximitySensorLeftBoolSub = message_filters.Subscriber('proximitySensorLeftBool', Bool)
+    proximitySensorRightBoolSub = message_filters.Subscriber('proximitySensorRightBool', Bool)
+    proximitySensorLeftDistanceSub = message_filters.Subscriber('proximitySensorLeftDistance', Float64)
+    proximitySensorRightDistanceSub = message_filters.Subscriber('proximitySensorRightDistance', Float64)
+    
+    approximateTimeSyncronizer = message_filters.ApproximateTimeSynchronizer([gpsSub, proximitySensorLeftBoolSub, proximitySensorRightBoolSub, proximitySensorLeftDistanceSub, proximitySensorRightDistanceSub], queue_size=10, slop=0.1, allow_headerless=True)
     approximateTimeSyncronizer.registerCallback(callback)
     rospy.spin()
 
