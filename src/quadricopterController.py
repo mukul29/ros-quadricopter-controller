@@ -12,26 +12,66 @@ rotationStep = 0.01
 
 targetPosition = Pose()
 gpsPub = rospy.Publisher('gpsToVREP', Pose, queue_size=100)
+
+# Initial weights for the neural network
+w11 = 0.5
+w22 = 0.5
+w12 = -0.5
+w21 = -0.5
+
+# required for mapping the sensory outputs to a range of -1 to +1
+maxDetectableDistance = 0.64 # range + radius + margin of error parameters of proximity sensors used in V-REP
+minDistanceConsidered = 0.2 # very close to the obstacle, closer than this automatically sets the resultProximitySensorLeft to 1
+inputStart = 1.0 / maxDetectableDistance
+inputEnd = 1.0 / minDistanceConsidered
+outputStart = -1.0
+outputEnd = 1.0
+slope = (outputEnd - outputStart) / (inputEnd - inputStart)
+continueMovement = 1
+
+
 def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySensorLeftDistance, proximitySensorRightDistance):
     targetPosition = gps
     print targetPosition
-    print proximitySensorLeftBool
-    print proximitySensorRightBool
-    print proximitySensorLeftDistance
-    print proximitySensorRightDistance
+    print "Left sensor trigger " + str(proximitySensorLeftBool.data)
+    print "Right sensor trigger " + str(proximitySensorRightBool.data)
+    print "Left sensor distance " + str(proximitySensorLeftDistance.data)
+    print "Right sensor distance " + str(proximitySensorRightDistance.data)
 
     # Move the quadricopter forward 
     # This forward movement will be required later
-    targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z)
-    targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z)
+    global continueMovement
+    targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) * continueMovement
+    targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z) * continueMovement
 
     # IMPLEMENT NEURAL CONTROL HERE
+    
+    # We map the sensory output to a range of -1 to +1    
+    resultProximitySensorLeft = -1 # If no obstacle is detected
+    if proximitySensorLeftBool.data:
+        continueMovement = 0
+        if proximitySensorLeftDistance.data >= minDistanceConsidered:
+            resultProximitySensorLeft = 1.0 / proximitySensorLeftDistance.data
+            resultProximitySensorLeft = outputStart + slope * (resultProximitySensorLeft - inputStart)
+        else:
+            resultProximitySensorLeft = 1
+
+    resultProximitySensorRight = -1 # If no obstacle is detected
+    if proximitySensorRightBool.data:
+        continueMovement = 0
+        if proximitySensorRightDistance.data >= minDistanceConsidered:
+            resultProximitySensorRight = 1.0 / proximitySensorRightDistance.data
+            slope = (outputEnd - outputStart) / (inputEnd - inputStart)
+            resultProximitySensorRight = outputStart + slope * (resultProximitySensorRight - inputStart)
+        else:
+            resultProximitySensorRight = 1
+
+
 
     ###############################################
 
 
     gpsPub.publish(targetPosition)
-    print targetPosition
 
 def controller():
     rospy.init_node('connectionToVREP', anonymous=True)
