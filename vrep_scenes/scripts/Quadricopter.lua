@@ -7,7 +7,7 @@ function sysCall_init()
         sim.dlgstyle_ok, false, '', nil, {0.8, 0, 0, 0, 0, 0})
     end
 
-    -- Detatch the manipulation sphere:
+    -- Detach the manipulation sphere:
     targetObj = sim.getObjectHandle('Quadricopter_target')
     sim.setObjectParent(targetObj, -1, true)
 
@@ -71,13 +71,15 @@ function sysCall_init()
         local proximitySensorRightDistanceTopicName = 'proximitySensorRightDistance'
         local targetPositionSendTopicName = 'gpsToROS'
         local targetPositionReceiveTopicName = 'gpsToVREP'
+        local frontVisionSensorTopicName = "frontVisionSensor"
 
         proximitySensorLeftBoolPub = simROS.advertise('/'..proximitySensorLeftBoolTopicName, 'std_msgs/Bool')
         proximitySensorRightBoolPub = simROS.advertise('/'..proximitySensorRightBoolTopicName, 'std_msgs/Bool')
         proximitySensorLeftDistancePub = simROS.advertise('/'..proximitySensorLeftDistanceTopicName, 'std_msgs/Float64')
         proximitySensorRightDistancePub = simROS.advertise('/'..proximitySensorRightDistanceTopicName, 'std_msgs/Float64')
         targetPositionOrientationPub = simROS.advertise('/'..targetPositionSendTopicName, 'geometry_msgs/Pose')
-
+        frontVisionSensorPub = simROS.advertise('/'..frontVisionSensorTopicName, 'sensor_msgs/Image')
+        simROS.publisherTreatUInt8ArrayAsString(frontVisionSensorPub) -- tables/arrays are slower in Lua
         targetPositionOrientationSub = simROS.subscribe('/'..targetPositionReceiveTopicName, 'geometry_msgs/Pose', 'moveTarget')
     else
         print("<font color = '#F00'>ROS interface was not found. Cannot run.</font>@html")
@@ -97,6 +99,7 @@ function sysCall_cleanup()
     simROS.shutdownPublisher(proximitySensorLeftDistancePub)
     simROS.shutdownPublisher(proximitySensorRightDistancePub)
     simROS.shutdownPublisher(targetPositionOrientationPub)
+    simROS.shutdownPublisher(frontVisionSensorPub)
     sim.setObjectParent(targetObj, quadricopterBase, false)
 end 
 
@@ -138,6 +141,18 @@ function sysCall_actuation()
     targetPublishData['position'] = {x = targetPosition[1], y = targetPosition[2], z = targetPosition[3]}
     targetPublishData['orientation'] = {x = targetOrientation[1], y = targetOrientation[2], z = targetOrientation[3], w = 1}
     simROS.publish(targetPositionOrientationPub, targetPublishData)
+    
+    -- Publishing visual feed from front vision sensor
+    local data,w,h=sim.getVisionSensorCharImage(frontVisionSensor)
+    d={}
+    d['header']={seq=0,stamp=simROS.getTime(), frame_id="a_optical"}
+    d['height']=h
+    d['width']=w
+    d['encoding']='rgb8'
+    d['is_bigendian']=1
+    d['step']=w*3
+    d['data']=data
+    simROS.publish(frontVisionSensorPub,d)
     --------------------------------------------------------------------------------------------
     
 
