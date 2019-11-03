@@ -75,8 +75,8 @@ function sysCall_init()
 
         proximitySensorLeftBoolPub = simROS.advertise('/'..proximitySensorLeftBoolTopicName, 'std_msgs/Bool')
         proximitySensorRightBoolPub = simROS.advertise('/'..proximitySensorRightBoolTopicName, 'std_msgs/Bool')
-        proximitySensorLeftDistancePub = simROS.advertise('/'..proximitySensorLeftDistanceTopicName, 'std_msgs/Float64')
-        proximitySensorRightDistancePub = simROS.advertise('/'..proximitySensorRightDistanceTopicName, 'std_msgs/Float64')
+        proximitySensorLeftDistancePub = simROS.advertise('/'..proximitySensorLeftDistanceTopicName, 'std_msgs/Float32')
+        proximitySensorRightDistancePub = simROS.advertise('/'..proximitySensorRightDistanceTopicName, 'std_msgs/Float32')
         targetPositionOrientationPub = simROS.advertise('/'..targetPositionSendTopicName, 'geometry_msgs/Pose')
         frontVisionSensorPub = simROS.advertise('/'..frontVisionSensorTopicName, 'sensor_msgs/Image')
         simROS.publisherTreatUInt8ArrayAsString(frontVisionSensorPub) -- tables/arrays are slower in Lua
