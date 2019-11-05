@@ -14,10 +14,21 @@ targetPosition = Pose()
 gpsPub = rospy.Publisher('gpsToVREP', Pose, queue_size=100)
 
 # Initial weights for the neural network
+# These weights will be changed dynamically by correlation based learning rule as a part of RNN
 w11 = 0.5
 w22 = 0.5
 w12 = -0.5
 w21 = -0.5
+# The following weights will remain unchanged
+w13 = 1
+w23 = -1
+w16 = 1
+w27 = 1
+w64 = 0.5
+w74 = 0.5
+w45 = 8
+wBias5 = -3
+
 
 # required for mapping the sensory outputs to a range of -1 to +1
 maxDetectableDistance = 0.64 # range + radius + margin of error parameters of proximity sensors used in V-REP
