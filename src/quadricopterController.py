@@ -78,8 +78,8 @@ def controller():
     gpsSub = message_filters.Subscriber('gpsToROS', Pose)
     proximitySensorLeftBoolSub = message_filters.Subscriber('proximitySensorLeftBool', Bool)
     proximitySensorRightBoolSub = message_filters.Subscriber('proximitySensorRightBool', Bool)
-    proximitySensorLeftDistanceSub = message_filters.Subscriber('proximitySensorLeftDistance', Float64)
-    proximitySensorRightDistanceSub = message_filters.Subscriber('proximitySensorRightDistance', Float64)
+    proximitySensorLeftDistanceSub = message_filters.Subscriber('proximitySensorLeftDistance', Float32)
+    proximitySensorRightDistanceSub = message_filters.Subscriber('proximitySensorRightDistance', Float32)
     
     approximateTimeSyncronizer = message_filters.ApproximateTimeSynchronizer([gpsSub, proximitySensorLeftBoolSub, proximitySensorRightBoolSub, proximitySensorLeftDistanceSub, proximitySensorRightDistanceSub], queue_size=10, slop=0.1, allow_headerless=True)
     approximateTimeSyncronizer.registerCallback(callback)
