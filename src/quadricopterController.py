@@ -3,7 +3,7 @@ import rospy
 from geometry_msgs.msg import Pose
 import math
 from std_msgs.msg import Bool
-from std_msgs.msg import Float64
+from std_msgs.msg import Float32
 import message_filters
 
 # Attributes
