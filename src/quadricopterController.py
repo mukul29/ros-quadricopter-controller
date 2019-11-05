@@ -29,6 +29,12 @@ w74 = 0.5
 w45 = 8
 wBias5 = -3
 
+# constants for correlation based learning
+muR = 0.01
+muQ = 0.015
+gama = 0.0003
+k = -0.01
+
 
 # required for mapping the sensory outputs to a range of -1 to +1
 maxDetectableDistance = 0.64 # range + radius + margin of error parameters of proximity sensors used in V-REP
