@@ -9,7 +9,7 @@ import message_filters
 
 # Attributes
 translationStep = 0.01
-rotationStep = 10
+rotationStep = 1
 
 targetPosition = Pose()
 gpsPub = rospy.Publisher('gpsToVREP', Pose, queue_size=100)
@@ -33,6 +33,7 @@ w64 = 0.5
 w74 = 0.5
 w45 = 8
 wBias5 = -3
+bias = 1
 
 # constants for correlation based learning
 muR = 0.01
@@ -57,15 +58,16 @@ distanceAverage = (minDistanceConsidered + maxDetectableDistance) / 2
 # outputStart = -1.0
 # outputEnd = 1.0
 # slope = (outputEnd - outputStart) / (inputEnd - inputStart)
-continueMovement = 1
 
 def reflex(sensoryInput):
     return 1 if sensoryInput > -0.5 else 0
 
+def sigmoid(z):
+    return 1 / (1 + math.exp(-z))
+
 def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySensorLeftDistance, proximitySensorRightDistance):
 
     # getting the values of global variables
-    global continueMovement
     # global slope
     global w11T
     global w12T
@@ -99,25 +101,23 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
 
     # Move the quadricopter forward 
     # This forward movement will be required later
-    targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) * continueMovement
-    targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z) * continueMovement
+    # targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) 
+    # targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z)
 
     # IMPLEMENT NEURAL CONTROL HERE
     
     # We map the sensory output to a range of -1 to +1    
     o1 = -1 # If no obstacle is detected
     if proximitySensorLeftBool.data:
-        # continueMovement = 0
         if proximitySensorLeftDistance.data >= minDistanceConsidered:
             # o1 = 1.0 / proximitySensorLeftDistance.data
             # o1 = outputStart + slope * (o1 - inputStart)
-            o1 = math.tanh((distanceAverage - proximitySensorLeftDistance.data)*25)
+            o1 = math.tanh((distanceAverage - proximitySensorLeftDistance.data) * 25)
         else:
             o1 = 1
 
     o2 = -1 # If no obstacle is detected
     if proximitySensorRightBool.data:
-        # continueMovement = 0
         if proximitySensorRightDistance.data >= minDistanceConsidered:
             # o2 = 1.0 / proximitySensorRightDistance.data
             # slope = (outputEnd - outputStart) / (inputEnd - inputStart)
@@ -148,7 +148,12 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     a1 = w11T * o1TMinusOne + w12T * o2TMinusOne
     a2 = w21T * o1TMinusOne + w22T * o2TMinusOne
 
-    o3 = a1 * 1 + a2 * (-1)
+    print "o1 = " + str(o1)
+    print "o2 = " + str(o2)
+    print "a1 = " + str(a1)
+    print "a2 = " + str(a2)
+
+    o3 = a1 * w13 + a2 * w23
     a3 = math.tanh(o3 * 4)
     print "\na3 = " + str(a3)
     print "orientation = " + str(targetPosition.orientation.z)
@@ -157,6 +162,15 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     o1TMinusOne = o1
     o2TMinusOne = o2
 
+    a6 = sigmoid(w16 * a1)
+    a7 = sigmoid(w27 * a2)
+    a4 = math.tanh(w64 * a6 + w74 * a7)
+    a5 = math.tanh(w45 * a4 +  wBias5 * bias)
+
+    print "a5 = " + str(a5)
+
+    targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) * a5
+    targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z) * a5
     ###############################################
 
 
@@ -177,5 +191,7 @@ def controller():
 if __name__ == '__main__':
     try:
         controller()
+        # print sigmoid(-1)
+        # print sigmoid(1)
     except rospy.ROSInterruptException:
         pass
