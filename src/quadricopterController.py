@@ -9,11 +9,13 @@ import message_filters
 
 # Attributes
 translationStep = 0.01
-rotationStep = 1
+rotationStep = 0.02
 
 targetPosition = Pose()
 gpsPub = rospy.Publisher('gpsToVREP', Pose, queue_size=100)
 
+a1 = -1
+a2 = -1
 # Initial weights for the neural network
 # These weights will be changed dynamically by correlation based learning rule as a part of RNN
 w11T = 0.5
@@ -25,10 +27,10 @@ w12TPlusOne = -0.5
 w21TPlusOne = -0.5
 w21T = -0.5
 # The following weights will remain unchanged
-w13 = 1
-w23 = -1
-w16 = 1
-w27 = 1
+w13 = -1
+w23 = 1
+w16 = -1
+w27 = -1
 w64 = 0.5
 w74 = 0.5
 w45 = 8
@@ -43,8 +45,8 @@ k = -0.01
 
 v1TMinusOne = 0
 v2TMinusOne = 0
-q1T = 0
-q2T = 0
+q1T = 1
+q2T = 1
 
 o1TMinusOne = -1
 o2TMinusOne = -1
@@ -83,9 +85,11 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     global q2T
     global o1TMinusOne
     global o2TMinusOne
+    global a1
+    global a2
 
 
-    # 
+    # Getting values from the previous iteration
     w11T = w11TPlusOne
     w22T = w22TPlusOne
     w12T = w12TPlusOne
@@ -96,16 +100,10 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     # print targetPosition
     # print "Left sensor trigger " + str(proximitySensorLeftBool.data)
     # print "Right sensor trigger " + str(proximitySensorRightBool.data)
-    # print "Left sensor distance " + str(proximitySensorLeftDistance.data)
-    # print "Right sensor distance " + str(proximitySensorRightDistance.data)
-
-    # Move the quadricopter forward 
-    # This forward movement will be required later
-    # targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) 
-    # targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z)
+    print "Left sensor distance " + str(proximitySensorLeftDistance.data)
+    print "Right sensor distance " + str(proximitySensorRightDistance.data)
 
     # IMPLEMENT NEURAL CONTROL HERE
-    
     # We map the sensory output to a range of -1 to +1    
     o1 = -1 # If no obstacle is detected
     if proximitySensorLeftBool.data:
@@ -131,43 +129,48 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     r1 = reflex(o1)
     r2 = reflex(o2)
 
+    # Weights for synaptic plasticity
     w11TPlusOne = w11T + (muR * v1TMinusOne * v1T * r1) + (gamma * (k - v1T) * w11T * w11T)
     w22TPlusOne = w22T + (muR * v2TMinusOne * v2T * r2) + (gamma * (k - v2T) * w22T * w22T)
 
-    v1TMinusOne = v1T
-    v2TMinusOne = v2T
+    a1 = math.tanh(w11T * math.tanh(a1) + w12T * math.tanh(a2) + 7 * o1)
+    a2 = math.tanh(w21T * math.tanh(a1) + w22T * math.tanh(a1) + 7 * o2)
 
+    o3 = a1 * w13 + a2 * w23
+    a3 = math.tanh(o3)
+    targetPosition.orientation.z += a3 * rotationStep
+
+    # Pitch Control
     q1TPlusOne = muQ * v1TMinusOne * v1T * r1 + gamma * (k - v1T) * q1T * q1T
     q2TPlusOne = muQ * v2TMinusOne * v2T * r2 + gamma * (k - v2T) * q2T * q2T
 
     w12TPlusOne = w12T + 0.5 * (q1TPlusOne + q2TPlusOne)
     w21TPlusOne = w12TPlusOne
-    q1T = q1TPlusOne
-    q2T = q2TPlusOne
-
-    a1 = w11T * o1TMinusOne + w12T * o2TMinusOne
-    a2 = w21T * o1TMinusOne + w22T * o2TMinusOne
-
+    a6 = sigmoid(w16 * o1)
+    a7 = sigmoid(w27 * o2)
+    a4 = math.tanh(w64 * a6 + w74 * a7)
+    a5 = math.tanh(w45 * a4 +  wBias5 * bias)
+    
+    print "r1 = " + str(r1)
+    print "r2 = " + str(r2)
+    print "w11 = " + str(w11T)
+    print "w22 = " + str(w22T)
+    print "w12 = " + str(w12T)
     print "o1 = " + str(o1)
     print "o2 = " + str(o2)
     print "a1 = " + str(a1)
     print "a2 = " + str(a2)
+    print "a3 = " + str(a3)
+    print "a5 = " + str(a5)
+    print
 
-    o3 = a1 * w13 + a2 * w23
-    a3 = math.tanh(o3 * 4)
-    print "\na3 = " + str(a3)
-    print "orientation = " + str(targetPosition.orientation.z)
-    targetPosition.orientation.z = -1 * a3 * rotationStep
-
+    # Assigning values for the next iteration
     o1TMinusOne = o1
     o2TMinusOne = o2
-
-    a6 = sigmoid(w16 * a1)
-    a7 = sigmoid(w27 * a2)
-    a4 = math.tanh(w64 * a6 + w74 * a7)
-    a5 = math.tanh(w45 * a4 +  wBias5 * bias)
-
-    print "a5 = " + str(a5)
+    v1TMinusOne = v1T
+    v2TMinusOne = v2T
+    q1T = q1TPlusOne
+    q2T = q2TPlusOne
 
     targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) * a5
     targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z) * a5
@@ -191,7 +194,5 @@ def controller():
 if __name__ == '__main__':
     try:
         controller()
-        # print sigmoid(-1)
-        # print sigmoid(1)
     except rospy.ROSInterruptException:
         pass
