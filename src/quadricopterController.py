@@ -89,13 +89,6 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     global a2
 
 
-    # Getting values from the previous iteration
-    w11T = w11TPlusOne
-    w22T = w22TPlusOne
-    w12T = w12TPlusOne
-    w21T = w21TPlusOne
-
-
     targetPosition = gps
     # print targetPosition
     # print "Left sensor trigger " + str(proximitySensorLeftBool.data)
@@ -171,6 +164,10 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     v2TMinusOne = v2T
     q1T = q1TPlusOne
     q2T = q2TPlusOne
+    w11T = w11TPlusOne
+    w22T = w22TPlusOne
+    w12T = w12TPlusOne
+    w21T = w21TPlusOne
 
     targetPosition.position.x += translationStep * math.cos(targetPosition.orientation.z) * a5
     targetPosition.position.y += translationStep * math.sin(targetPosition.orientation.z) * a5
