@@ -68,6 +68,8 @@ function sysCall_init()
         local proximitySensorLeftBoolTopicName = 'proximitySensorLeftBool'
         local proximitySensorRightBoolTopicName = 'proximitySensorRightBool'
         local proximitySensorLeftDistanceTopicName = 'proximitySensorLeftDistance'
+        local proximitySensorLeftDetectedCoordinatesTopicName = 'proximitySensorLeftDetectedCoordinates'
+        local proximitySensorRightDetectedCoordinatesTopicName = 'proximitySensorRightDetectedCoordinates'
         local proximitySensorRightDistanceTopicName = 'proximitySensorRightDistance'
         local targetPositionSendTopicName = 'gpsToROS'
         local targetPositionReceiveTopicName = 'gpsToVREP'
@@ -79,6 +81,8 @@ function sysCall_init()
         proximitySensorRightDistancePub = simROS.advertise('/'..proximitySensorRightDistanceTopicName, 'std_msgs/Float32')
         targetPositionOrientationPub = simROS.advertise('/'..targetPositionSendTopicName, 'geometry_msgs/Pose')
         frontVisionSensorPub = simROS.advertise('/'..frontVisionSensorTopicName, 'sensor_msgs/Image')
+        proximitySensorLeftDetectedCoordinatesPub = simROS.advertise('/'..proximitySensorLeftDetectedCoordinatesTopicName, 'geometry_msgs/Point')
+        proximitySensorRightDetectedCoordinatesPub = simROS.advertise('/'..proximitySensorRightDetectedCoordinatesTopicName, 'geometry_msgs/Point')
         simROS.publisherTreatUInt8ArrayAsString(frontVisionSensorPub) -- tables/arrays are slower in Lua
         targetPositionOrientationSub = simROS.subscribe('/'..targetPositionReceiveTopicName, 'geometry_msgs/Pose', 'moveTarget')
     else
@@ -100,6 +104,8 @@ function sysCall_cleanup()
     simROS.shutdownPublisher(proximitySensorRightDistancePub)
     simROS.shutdownPublisher(targetPositionOrientationPub)
     simROS.shutdownPublisher(frontVisionSensorPub)
+    simROS.shutdownPublisher(proximitySensorLeftDetectedCoordinatesPub)
+    simROS.shutdownPublisher(proximitySensorRightDetectedCoordinatesPub)
     sim.setObjectParent(targetObj, quadricopterBase, false)
 end 
 
@@ -118,22 +124,30 @@ function sysCall_actuation()
     detectionTriggerLeft['data'] = resultLeft[1]>0
     simROS.publish(proximitySensorLeftBoolPub, detectionTriggerLeft)
     local proximityDistanceLeft = {}
+    local proximityDetectedPointLeft = {x = nil, y = nil, z = nil} 
+    local proximitySensorLeftPosition = sim.getObjectPosition(proximitySensorLeft, -1)
     proximityDistanceLeft['data'] = -1
     if (detectionTriggerLeft['data']) then
         proximityDistanceLeft['data'] = resultLeft[2]
+        proximityDetectedPointLeft = {x = proximitySensorLeftPosition[1] + resultLeft[3][1], y = proximitySensorLeftPosition[2] + resultLeft[3][2], z = proximitySensorLeftPosition[3] + resultLeft[3][3]}
     end
+    simROS.publish(proximitySensorLeftDetectedCoordinatesPub, proximityDetectedPointLeft)
     simROS.publish(proximitySensorLeftDistancePub, proximityDistanceLeft)
 
-    -- Publishing left proximity sensor data
+    -- Publishing right proximity sensor data
     local resultRight = {sim.readProximitySensor(proximitySensorRight)}
     local detectionTriggerRight = {}
     detectionTriggerRight['data'] = resultRight[1]>0
     simROS.publish(proximitySensorRightBoolPub, detectionTriggerRight)
     local proximityDistanceRight = {}
+    local proximityDetectedPointRight = {x = nil, y = nil, z = nil} 
+    local proximitySensorRightPosition = sim.getObjectPosition(proximitySensorRight, -1)
     proximityDistanceRight['data'] = -1
     if (detectionTriggerRight['data']) then
         proximityDistanceRight['data'] = resultRight[2]
+        proximityDetectedPointRight = {x = proximitySensorRightPosition[1] + resultRight[3][1], y = proximitySensorRightPosition[2] + resultRight[3][2], z = proximitySensorRightPosition[3] + resultRight[3][3]}
     end
+    simROS.publish(proximitySensorRightDetectedCoordinatesPub, proximityDetectedPointRight)
     simROS.publish(proximitySensorRightDistancePub, proximityDistanceRight)
 
     --publishing target position and orientation (gps)
@@ -175,7 +189,6 @@ function sysCall_actuation()
     end
     
     -- Vertical control:
-    targetPosition = sim.getObjectPosition(targetObj, -1)
     pos = sim.getObjectPosition(quadricopterBase, -1)
     quadricopterVelocity = sim.getVelocity(quadricopter)
     deltaPos = (targetPosition[3] - pos[3])
