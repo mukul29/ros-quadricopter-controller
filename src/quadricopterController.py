@@ -144,17 +144,17 @@ def callback(gps, proximitySensorLeftBool, proximitySensorRightBool, proximitySe
     a4 = math.tanh(w64 * a6 + w74 * a7)
     a5 = math.tanh(w45 * a4 +  wBias5 * bias)
     
-    print "r1 = " + str(r1)
-    print "r2 = " + str(r2)
+    # print "r1 = " + str(r1)
+    # print "r2 = " + str(r2)
     print "w11 = " + str(w11T)
     print "w22 = " + str(w22T)
     print "w12 = " + str(w12T)
-    print "o1 = " + str(o1)
-    print "o2 = " + str(o2)
-    print "a1 = " + str(a1)
-    print "a2 = " + str(a2)
-    print "a3 = " + str(a3)
-    print "a5 = " + str(a5)
+    # print "o1 = " + str(o1)
+    # print "o2 = " + str(o2)
+    # print "a1 = " + str(a1)
+    # print "a2 = " + str(a2)
+    # print "a3 = " + str(a3)
+    # print "a5 = " + str(a5)
     print
 
     # Assigning values for the next iteration
