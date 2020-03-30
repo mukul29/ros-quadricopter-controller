@@ -6,7 +6,7 @@ The simulation of the flight of a drone and its autonomous avoidance of obstacle
 a two-neuron recurrent neural network. 
 
 The programming of the flight of the drone is done in lua inside V-REP while the neural control 
-handling obstacle avoidance is programmed in Python 2.7 both of which are interfaces using ROS nodes and messages.
+handling obstacle avoidance is programmed in Python 2.7 both of which are interfaced using ROS nodes and messages.
 
 ### Software requirements
 1. Ubuntu 18.04 (required for ROS Melodic)
